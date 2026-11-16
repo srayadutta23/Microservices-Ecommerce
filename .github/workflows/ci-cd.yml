@@ -1,0 +1,40 @@
+name: CI-CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { name: ecommerce-frontend,        path: frontend,                  args: "VITE_API_GATEWAY_URL=http://localhost:4000" }
+          - { name: ecommerce-api-gateway,     path: api-gateway,               args: "" }
+          - { name: ecommerce-user-service,    path: services/user-service,     args: "" }
+          - { name: ecommerce-product-service, path: services/product-service,  args: "" }
+          - { name: ecommerce-order-service,   path: services/order-service,    args: "" }
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Login to Docker Hub
+        if: github.event_name == 'push'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build, and push on main
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.path }}
+          build-args: ${{ matrix.args }}
+          push: ${{ github.event_name == 'push' }}
+          tags: |
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.name }}:latest
+            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.name }}:${{ github.sha }}
